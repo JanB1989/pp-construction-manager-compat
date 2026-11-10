@@ -1,0 +1,29 @@
+[project]
+name = "pp-construction-manager-compat"
+version = "0.1.0"
+description = "Compatibility patch between the EU5 mods Prosper or Perish and Construction Manager (Community Mod Framework)."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "prosper-or-perish-constructor",
+]
+
+[project.scripts]
+ppcm = "ppcm.build:main"
+
+[build-system]
+requires = ["uv_build>=0.9.24,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["pytest>=9.0.3"]
+
+[tool.uv.sources]
+# the Prosper or Perish constructor (its data: farms, improvements, build costs); a sibling checkout
+prosper-or-perish-constructor = { path = "../ProsperOrPerishConstructor-cmf", editable = true }
+
+[tool.uv.build-backend]
+module-name = "ppcm"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,301 @@
+﻿# Prosper or Perish rules for Construction Manager (CM): three features of CM's priority list.
+#   Auto-Food (CM's own row, its body replaced: cm_patch.py): Prosper or Perish's food rule, per province.
+#   Granaries (new row): a Granary level where a province's store has little room, is nearly full and still grows.
+#   Improvements (new row): where people fill a location's capacity to the line (a CM setting), the improvement that
+#     adds the most capacity per gold; a standing older tier is upgraded.
+#   Logistics (new row): where market access without event effects is below the line (a CM setting), the first
+#     logistics building that can be built, the most urgent locations first.
+# The rules are Prosper or Perish's Construction Plan rules (2026-11-08/09, Jan), ported: they only pick; CM builds.
+# A pick is staged into CM's ungated queue (CM's executor checks the engine's cost against CM's Gold Reserve, a free
+# construction slot, the construction goods and the engine's can-build) or, where an older tier of the building
+# stands, into CM's upgrade queue without CM's metric gate (as CM's Auto-Upgrade All Buildings does). The generated
+# pickers (ppcm_generated.txt) call ppcm_construct / ppcm_construct_food.
+# Expects scope:cm_country (CM's dispatcher saves it). Variables carry + 100 where noted.
+
+# ---- The features (country scope) ----
+
+# Auto-Food: Prosper or Perish's food rule in every province of the country.
+ppcm_run_food = {
+	every_province = {
+		ppcm_food_province = yes
+	}
+	scope:cm_country = { remove_variable = ppcm_hit }
+}
+
+# Granaries: a Granary level in the province capital of every province where one is due.
+ppcm_run_granaries = {
+	save_temporary_scope_value_as = { name = ppcm_feature value = 2 }
+	every_province = {
+		limit = { ppcm_granary_due = yes }
+		scope:cm_country = { remove_variable = ppcm_hit }
+		province_capital ?= {
+			if = {
+				limit = { ppcm_food_ok = yes }
+				ppcm_try_granary_here = yes
+			}
+		}
+	}
+	scope:cm_country = { remove_variable = ppcm_hit }
+}
+
+# Improvements: where population over capacity reaches the line, fullest first.
+ppcm_run_improvements = {
+	save_temporary_scope_value_as = { name = ppcm_feature value = 3 }
+	ordered_owned_location = {
+		limit = {
+			ppcm_improve_ok = yes
+			location_population_percentage >= scope:cm_country.ppcm_improve_line
+		}
+		order_by = ppcm_fill_here
+		max = 200
+		check_range_bounds = no
+		scope:cm_country = { remove_variable = ppcm_hit }
+		ppcm_try_improve_here = yes
+	}
+	scope:cm_country = { remove_variable = ppcm_hit }
+}
+
+# Logistics: where market access without event effects is below the line, the most urgent first (Prosper or Perish's
+# logistics urgency), the first logistics building that can be built there.
+ppcm_run_logistics = {
+	save_temporary_scope_value_as = { name = ppcm_feature value = 4 }
+	ordered_owned_location = {
+		limit = { ppcm_logistics_wanted = yes }
+		order_by = pp_logistics_urgency_weight
+		max = 200
+		check_range_bounds = no
+		scope:cm_country = { remove_variable = ppcm_hit }
+		ppcm_try_logistics_here = yes
+	}
+	scope:cm_country = { remove_variable = ppcm_hit }
+}
+
+# Province scope: the food rule, one construction a month, the first of these that applies (Prosper or Perish's
+# baseline rules, Jan 2026-11-08; the Granary step is the Granaries feature). The hunger checks read the store a year
+# from now in a normal year (ppcm_food_in_a_year: this year's harvest and spoilage taken out).
+#   1. famine (below the famine line): a Tavern in the province capital, where its market holds victuals;
+#   2. hungry (below the hungry line): the staple food maker (crop farm, orchard, fishery, herd, forest village) that
+#      pays back fastest, in the province location where it pays back fastest;
+#   3. a kitchen whenever the Cookshop budget allows (its successor first);
+#   4. hungry and nothing above staged: a Tavern, where its market holds victuals (provinces that cannot farm);
+#   5. a Grange where the store holds 24 months and a normal month adds the line's share on top;
+#   6. a Victualling Yard: the next level while it pays back within the line, a first one where victuals cost at least
+#      their default price.
+# While a farm or Tavern of the province has a level under construction, the hunger steps 2 and 4 wait (the store only
+# moves once it stands).
+ppcm_food_province = {
+	save_temporary_scope_value_as = { name = ppcm_feature value = 1 }
+	scope:cm_country = { remove_variable = ppcm_hit }
+	if = {
+		limit = { has_variable = pp_stored_food_months }
+		save_temporary_scope_value_as = { name = ppcm_fy value = ppcm_food_in_a_year }
+		# 1. famine: a Tavern
+		if = {
+			limit = { ppcm_famine = yes }
+			province_capital ?= {
+				if = {
+					limit = {
+						ppcm_food_ok = yes
+						ppcm_victuals_here = yes
+					}
+					ppcm_try_tavern_here = yes
+				}
+			}
+		}
+		# 2. hungry: a farm
+		if = {
+			limit = {
+				ppcm_may_try = yes
+				ppcm_hungry = yes
+				NOT = { any_location_in_province = { ppcm_food_queued = yes } }
+			}
+			ordered_location_in_province = {
+				limit = {
+					ppcm_food_ok = yes
+					ppcm_farm_best_roi > 0
+				}
+				order_by = ppcm_farm_best_roi
+				max = ppcm_farm_sites
+				check_range_bounds = no
+				if = {
+					limit = { ppcm_may_try = yes }
+					ppcm_try_farm_here = yes
+				}
+			}
+		}
+		# 3. a kitchen, whenever it can be built
+		if = {
+			limit = { ppcm_may_try = yes }
+			province_capital ?= {
+				if = {
+					limit = { ppcm_food_ok = yes }
+					ppcm_try_kitchen_here = yes
+				}
+			}
+		}
+		# 4. hungry and nothing else possible: a Tavern
+		if = {
+			limit = {
+				ppcm_may_try = yes
+				ppcm_hungry = yes
+				NOT = { any_location_in_province = { ppcm_food_queued = yes } }
+			}
+			province_capital ?= {
+				if = {
+					limit = {
+						ppcm_food_ok = yes
+						ppcm_victuals_here = yes
+					}
+					ppcm_try_tavern_here = yes
+				}
+			}
+		}
+		# 5. a Grange
+		if = {
+			limit = {
+				ppcm_may_try = yes
+				ppcm_grange_due = yes
+			}
+			province_capital ?= {
+				if = {
+					limit = { ppcm_food_ok = yes }
+					ppcm_try_grange_here = yes
+				}
+			}
+		}
+		# 6. a Victualling Yard
+		if = {
+			limit = { ppcm_may_try = yes }
+			every_location_in_province = {
+				limit = {
+					ppcm_food_ok = yes
+					OR = {
+						pp_victualling_yard_site = yes
+						is_market_center = yes
+					}
+				}
+				if = {
+					limit = { ppcm_may_try = yes }
+					ppcm_try_yard_here = yes
+				}
+			}
+		}
+	}
+	scope:cm_country = { remove_variable = ppcm_hit }
+}
+
+# ---- Staging (location scope) ----
+
+# Stage one level of $type$ here (the generated pickers; $why$ is the plan's construction code, unused here).
+ppcm_construct = {
+	building_type:$type$ = { save_scope_as = ppcm_btype }
+	ppcm_construct_scoped = yes
+}
+ppcm_construct_food = {
+	building_type:$type$ = { save_scope_as = ppcm_btype }
+	ppcm_construct_scoped = yes
+}
+
+# Stage scope:ppcm_btype here when the location is free (ppcm_location_free), no level of it is under construction,
+# no level of it here is closed (whoever closed it found it does not pay), and its construction goods are no dearer
+# than the feature's Min Discount allows. Where a standing building of an older tier would become this type, its
+# upgrade is staged instead. Marks the decision (ppcm_hit: one construction a province for the food rule).
+ppcm_construct_scoped = {
+	if = {
+		limit = {
+			ppcm_location_free = yes
+			# a building type the player excluded here from CM's auto-expand stays out (CM's location view)
+			NOT = { is_target_in_variable_list = { name = cm_auto_expand_excluded_building_types target = scope:ppcm_btype } }
+			ppcm_bt_queued < 0.5
+			NOT = {
+				any_buildings_in_location = {
+					building_type = scope:ppcm_btype
+					building_level > 0
+					is_opened = no
+				}
+			}
+		}
+		save_scope_as = cm_location
+		scope:ppcm_btype = { save_scope_as = cm_building_type }
+		ppcm_discount_line = yes
+		if = {
+			limit = { cm_building_meets_minimum_discount = { threshold = scope:ppcm_dc } }
+			ppcm_find_older_tier = yes
+			if = {
+				limit = { has_variable = ppcm_old }
+				ppcm_stage_upgrade = yes
+			}
+			else = {
+				cm_stage_ungated_candidate = yes
+			}
+			remove_variable = ppcm_old
+			scope:cm_country = { set_variable = { name = ppcm_hit value = yes } }
+		}
+	}
+}
+
+# Any scope: scope:ppcm_dc = the Min Discount of the feature that runs (scope:ppcm_feature: 1 food = the Auto-Food
+# row, 2 Granaries, 3 Improvements, 4 Logistics), for CM's discount check.
+ppcm_discount_line = {
+	save_temporary_scope_value_as = { name = ppcm_dc value = cm_get_min_discount_for_auto_food }
+	if = {
+		limit = { scope:ppcm_feature > 1.5 scope:ppcm_feature < 2.5 }
+		save_temporary_scope_value_as = { name = ppcm_dc value = scope:cm_country.ppcm_min_discount_granaries }
+	}
+	else_if = {
+		limit = { scope:ppcm_feature > 2.5 scope:ppcm_feature < 3.5 }
+		save_temporary_scope_value_as = { name = ppcm_dc value = scope:cm_country.ppcm_min_discount_improvements }
+	}
+	else_if = {
+		limit = { scope:ppcm_feature > 3.5 }
+		save_temporary_scope_value_as = { name = ppcm_dc value = scope:cm_country.ppcm_min_discount_logistics }
+	}
+}
+
+# Location scope (scope:cm_location), scope:ppcm_btype set: the location's variable ppcm_old = the type of a
+# standing building here that is obsolete for the country and whose current tier (CM's upgrade map, walked by
+# cm_find_current_building_type) is scope:ppcm_btype; none when no such building stands.
+ppcm_find_older_tier = {
+	remove_variable = ppcm_old
+	every_buildings_in_location = {
+		limit = { building_level > 0 }
+		building_type = { save_scope_as = ppcm_this_type }
+		if = {
+			limit = {
+				scope:cm_location = { NOT = { has_variable = ppcm_old } }
+				scope:cm_country = { building_type_is_obsolete = scope:ppcm_this_type }
+			}
+			scope:ppcm_this_type = { cm_find_current_building_type = yes }
+			if = {
+				limit = { scope:cm_current_building_type = scope:ppcm_btype }
+				scope:cm_location = { set_variable = { name = ppcm_old value = scope:ppcm_this_type } }
+			}
+		}
+	}
+}
+
+# Location scope (scope:cm_location), var:ppcm_old = the standing older tier: stage its upgrade the way CM's
+# Auto-Upgrade All Buildings does (not marked as gated, so CM's executor checks the engine's can-upgrade, the cost
+# against the Gold Reserve and the construction goods, but no profit metric: improvements and Granaries earn nothing).
+ppcm_stage_upgrade = {
+	var:ppcm_old = { save_scope_as = ppcm_old }
+	scope:ppcm_old = { save_scope_as = cm_building_type }
+	scope:cm_location = {
+		if = {
+			limit = { NOT = { is_target_in_variable_list = { name = cm_q_upgrade_target_types target = scope:ppcm_btype } } }
+			add_to_variable_list = { name = cm_q_upgrade_target_types target = scope:ppcm_btype }
+		}
+		if = {
+			limit = { NOT = { is_target_in_variable_list = { name = cm_gui_upgrade_building_types target = scope:ppcm_old } } }
+			add_to_variable_list = { name = cm_gui_upgrade_building_types target = scope:ppcm_old }
+			scope:cm_country = { change_variable = { name = cm_q_staged add = 1 } }
+		}
+	}
+	scope:cm_country = {
+		if = {
+			limit = { NOT = { is_target_in_variable_list = { name = cm_gui_upgrade_locations target = scope:cm_location } } }
+			add_to_variable_list = { name = cm_gui_upgrade_locations target = scope:cm_location }
+			scope:cm_location = { clear_variable_list = cm_q_done_upgrade_types }
+		}
+	}
+}

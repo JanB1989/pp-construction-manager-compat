@@ -1,0 +1,8 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+# machine-local paths
+ppcm.local.toml
+# the built mod: it carries files merged from Construction Manager, whose code is not ours to publish
+build/

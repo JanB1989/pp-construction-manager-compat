@@ -1,0 +1,36 @@
+﻿# Prosper or Perish rules for Construction Manager: the settings, registered with the Community Mod Framework (CMF)
+# when CMF asks every mod for its settings (on every load). They sit on Construction Manager's Settings tab, beside
+# its priority list.
+cmf_on_mod_registration = {
+	on_actions = {
+		ppcm_on_register
+	}
+}
+
+ppcm_on_register = {
+	effect = {
+		# improvements where population reaches this % of a location's capacity (Prosper or Perish's Construction Plan
+		# line, 2026-11-08: steps of 10, above 100 % only crowded locations)
+		cmm_register_numeric_setting = {
+			mod_id = cm
+			setting_id = ppcm_improve_line
+			tab_id = settings
+			group_id = priority_list
+			default_value = 90
+			min_value = 50
+			max_value = 300
+			step_value = 10
+		}
+		# logistics where market access without event effects is below this % (the plan's line, default 97)
+		cmm_register_numeric_setting = {
+			mod_id = cm
+			setting_id = ppcm_access_line
+			tab_id = settings
+			group_id = priority_list
+			default_value = 97
+			min_value = 50
+			max_value = 100
+			step_value = 1
+		}
+	}
+}

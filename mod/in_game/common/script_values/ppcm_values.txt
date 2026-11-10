@@ -1,0 +1,260 @@
+﻿# Prosper or Perish rules for Construction Manager: values (ported from Prosper or Perish's Construction Plan,
+# pp_construction_plan.txt, 2026-11-09). The rules' numbers, the farm and improvement estimates and the construction
+# goods' price factors are generated (ppcm_generated.txt). Variables carry + 100 where noted.
+
+# ---- Settings (Construction Manager's settings tab; CMF stores them in the country's cmm map) ----
+
+# Country scope: improvements where population reaches this % of a location's capacity.
+ppcm_improve_pct = {
+	value = ppcm_improve_default
+	if = {
+		limit = { is_key_in_variable_map = { name = cmm target = flag:cm__ppcm_improve_line } }
+		value = "variable_map(cmm|flag:cm__ppcm_improve_line)"
+	}
+}
+# Country scope: the improvement line as a share of capacity (location_population_percentage).
+ppcm_improve_line = {
+	value = ppcm_improve_pct
+	divide = 100
+}
+# Country scope: the most discount markup the Granary and improvement features accept (Construction Manager's Min
+# Discount field of their priority list rows; the food feature reads the Auto-Food row's).
+ppcm_min_discount_granaries = {
+	value = 1
+	if = {
+		limit = { is_key_in_variable_map = { name = cm_priority_min_discount target = flag:ppcm_feature_granaries } }
+		value = "variable_map(cm_priority_min_discount|flag:ppcm_feature_granaries)"
+	}
+}
+ppcm_min_discount_logistics = {
+	value = 1
+	if = {
+		limit = { is_key_in_variable_map = { name = cm_priority_min_discount target = flag:ppcm_feature_logistics } }
+		value = "variable_map(cm_priority_min_discount|flag:ppcm_feature_logistics)"
+	}
+}
+# Country scope: logistics where market access without event effects is below this, in %.
+ppcm_access_pct = {
+	value = ppcm_access_default
+	if = {
+		limit = { is_key_in_variable_map = { name = cmm target = flag:cm__ppcm_access_line } }
+		value = "variable_map(cmm|flag:cm__ppcm_access_line)"
+	}
+}
+# Location scope: the owner's logistics line as a market access fraction.
+ppcm_access_line = {
+	value = 0
+	owner ?= { add = ppcm_access_pct }
+	divide = 100
+}
+ppcm_min_discount_improvements = {
+	value = 1
+	if = {
+		limit = { is_key_in_variable_map = { name = cm_priority_min_discount target = flag:ppcm_feature_improvements } }
+		value = "variable_map(cm_priority_min_discount|flag:ppcm_feature_improvements)"
+	}
+}
+
+# ---- The food store as a normal year would have it (province scope) ----
+# Nothing is remembered from month to month. Short-lived effects are taken out instead: this year's Variable Harvest
+# (its peasant food consumption, ppcm_harvest_rate) and spoilage. The rules read the store a year from now.
+
+# Peasants of the province (thousands, the unit of the pops' food consumption).
+ppcm_province_peasants = {
+	value = 0
+	every_location_in_province = {
+		add = num_pop_type:peasants
+	}
+}
+# Food the peasants eat more this month because of this year's harvest (less in a good year).
+ppcm_harvest_food = {
+	value = 0
+	province_capital ?= {
+		add = ppcm_harvest_rate
+	}
+	multiply = ppcm_province_peasants
+}
+# Food the province eats a month in a normal year.
+ppcm_normal_consumption = {
+	value = pp_stored_food_province_consumption
+	subtract = ppcm_harvest_food
+	min = 0.001
+}
+# Share of the store that spoils a month (EU5 1.4: the local and the owner's decay over 1 + the preservation of every
+# location of the province, at least 1).
+ppcm_spoil_divisor = {
+	value = 1
+	every_location_in_province = {
+		add = modifier:local_food_preservation_efficiency_modifier
+	}
+	min = 1
+}
+ppcm_spoil_rate = {
+	value = 0
+	province_capital ?= {
+		add = modifier:local_food_decay
+		owner ?= { add = modifier:global_food_decay }
+	}
+	divide = ppcm_spoil_divisor
+	min = 0
+}
+# Months of a normal year's consumption the store holds now (not capped).
+ppcm_store_months_now = {
+	value = province_food
+	divide = ppcm_normal_consumption
+}
+# What the store gains a month in a normal year, in months of consumption.
+ppcm_normal_gain = {
+	value = pp_province_food_balance
+	add = ppcm_harvest_food
+	subtract = {
+		value = province_food
+		multiply = ppcm_spoil_rate
+	}
+	divide = ppcm_normal_consumption
+}
+# The store a year from now in a normal year, in months, never above what the store can hold.
+ppcm_food_in_a_year = {
+	value = ppcm_normal_gain
+	multiply = 12
+	add = ppcm_store_months_now
+	if = {
+		limit = { ppcm_capacity_months > 0 }
+		max = ppcm_capacity_months
+	}
+}
+# Months of the province's consumption its store can hold (0 while nobody eats).
+ppcm_capacity_months = {
+	value = 0
+	if = {
+		limit = { pp_stored_food_province_consumption > 0 }
+		value = province_max_food
+		divide = ppcm_normal_consumption
+	}
+}
+# How full the store is, in %.
+ppcm_fill_pct = {
+	value = province_food_percentage
+	multiply = 100
+}
+# The normal month's gain in % of consumption (the Grange rule).
+ppcm_normal_gain_pct = {
+	value = ppcm_normal_gain
+	multiply = 100
+}
+# Location scope: victuals' price in this location's market over their default price (0 without a market).
+ppcm_victuals_price_ratio = {
+	value = 0
+	if = {
+		limit = { market ?= { always = yes } }
+		value = "market.market_price(goods:victuals)"
+		divide = "default_price(goods:victuals)"
+	}
+}
+
+# ---- Build cost and payback (location scope; scope:ppcm_btype = the building type, the temporary values
+# ppcm_ipl / ppcm_pf / ppcm_ef set by ppcm_btype_data or the generated pickers) ----
+# The engine's formula (Prosper or Perish, calibrated in game on 158 constructions, all within 1 %): base price
+# x (1 + increase_per_level_cost x standing levels) / max(0.5, 1 + build efficiency) x the construction goods' price
+# factor. Only the pickers' order reads it; Construction Manager pays the engine's own cost.
+
+ppcm_eff_base = {
+	value = 1
+	add = modifier:local_build_buildings_efficiency
+	owner ?= { add = modifier:global_build_buildings_efficiency }
+	if = {
+		limit = {
+			exists = scope:ppcm_btype
+			NOT = { has_building = scope:ppcm_btype }
+		}
+		add = modifier:local_build_new_buildings_efficiency
+	}
+}
+ppcm_eff_std = {
+	value = ppcm_eff_base
+	if = {
+		limit = { is_city = yes }
+		owner ?= { add = modifier:global_urban_build_buildings_efficiency }
+	}
+	else = {
+		owner ?= { add = modifier:global_rural_build_buildings_efficiency }
+	}
+	min = 0.5
+}
+ppcm_eff_fort = {
+	value = ppcm_eff_base
+	owner ?= { add = modifier:global_fort_build_buildings_efficiency }
+	min = 0.5
+}
+ppcm_eff_port = {
+	value = ppcm_eff_base
+	add = modifier:local_port_build_buildings_efficiency
+	owner ?= { add = modifier:global_port_build_buildings_efficiency }
+	min = 0.5
+}
+ppcm_eff_foreign = {
+	value = ppcm_eff_base
+	owner ?= { add = modifier:global_foreign_build_buildings_efficiency }
+	min = 0.5
+}
+ppcm_eff_mill = {
+	value = ppcm_eff_base
+	min = 0.5
+}
+
+# Standing levels and levels under construction of scope:ppcm_btype here.
+ppcm_bt_levels = {
+	value = 0
+	every_buildings_in_location = {
+		limit = { building_type = scope:ppcm_btype }
+		add = building_level
+	}
+}
+ppcm_bt_queued = {
+	value = 0
+	every_buildings_in_location = {
+		limit = { building_type = scope:ppcm_btype }
+		add = building_levels_under_construction
+	}
+}
+# Monthly profit per level of the standing scope:ppcm_btype here.
+ppcm_bt_profit = {
+	value = 0
+	every_buildings_in_location = {
+		limit = {
+			building_type = scope:ppcm_btype
+			building_level > 0
+		}
+		add = {
+			value = building_profit
+			divide = building_level
+		}
+	}
+}
+# The gold the next level of scope:ppcm_btype costs here.
+ppcm_est_cost = {
+	value = scope:ppcm_btype.building_base_cost_in_gold
+	multiply = {
+		value = ppcm_bt_levels
+		multiply = scope:ppcm_ipl
+		add = 1
+	}
+	divide = scope:ppcm_ef
+	multiply = scope:ppcm_pf
+}
+# Years the next level of scope:ppcm_btype takes to pay back its cost from the profit per level standing here.
+ppcm_est_payback_years = {
+	value = 999
+	if = {
+		limit = { ppcm_bt_profit > 0.001 }
+		value = ppcm_est_cost
+		divide = ppcm_bt_profit
+		divide = 12
+	}
+	max = 999
+}
+
+# Location scope: how full the location is (population over capacity), the improvement feature's order.
+ppcm_fill_here = {
+	value = location_population_percentage
+}

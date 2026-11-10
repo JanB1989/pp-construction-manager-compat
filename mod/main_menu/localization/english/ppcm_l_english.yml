@@ -1,0 +1,16 @@
+﻿l_english:
+  # Prosper or Perish rules for Construction Manager: the new rows of its priority list and their settings
+  cm__priority_list_i8_name: "Granaries (Prosper or Perish)"
+  cm__priority_list_i8_desc: "Adds a [ShowBuildingTypeName('granary')|e] level in the [province|e] capital of every province whose food store has little room, is nearly full and still grows. Uses the Min Discount beside it and your Gold Reserve."
+  cm__priority_list_i9_name: "Improvements (Prosper or Perish)"
+  cm__priority_list_i9_desc: "Where a [location|e]'s population reaches the Improvement Line share of its [population_capacity|e], adds a level of the improvement that adds the most capacity for its price there; an older tier standing there is upgraded instead. The fullest locations come first. Uses the Min Discount beside it and your Gold Reserve."
+  cm__priority_list_i10_name: "Logistics (Prosper or Perish)"
+  cm__priority_list_i10_desc: "Where a [location|e]'s [market_access|e] is below the Logistics Line while you control it, adds a level of the logistics building that location can have. Short-lived event effects on market access are taken out first. The most urgent locations come first. Uses the Min Discount beside it and your Gold Reserve."
+  cm__ppcm_access_line_name: "Logistics Line"
+  cm__ppcm_access_line_desc: "Logistics (Prosper or Perish) builds where a [location|e]'s [market_access|e] is below this, short-lived event effects taken out."
+  cm__ppcm_access_line_format: "[CMMV('cm__ppcm_access_line')]%"
+  cm__ppcm_access_line: "cm__ppcm_access_line"
+  cm__ppcm_improve_line_name: "Improvement Line"
+  cm__ppcm_improve_line_desc: "Improvements (Prosper or Perish) builds where a [location|e]'s population reaches this share of its [population_capacity|e]. A hundred percent means as many people as capacity; above that only crowded locations get one."
+  cm__ppcm_improve_line_format: "[CMMV('cm__ppcm_improve_line')]%"
+  cm__ppcm_improve_line: "cm__ppcm_improve_line"

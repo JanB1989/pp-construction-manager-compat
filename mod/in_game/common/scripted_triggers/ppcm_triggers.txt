@@ -1,0 +1,89 @@
+﻿# Prosper or Perish rules for Construction Manager: triggers (ported from Prosper or Perish's Construction Plan,
+# 2026-11-09). Every trigger here runs inside Construction Manager's monthly dispatcher, where scope:cm_country is the
+# player's country, unless noted.
+
+# Location scope: the rules may stage a construction here: the player's location, integrated, nothing under
+# construction (a location builds its constructions one after another, Prosper or Perish in game 2026-11-09), and no
+# Construction Manager feature earlier in the priority list staged one here this month.
+ppcm_location_free = {
+	owner ?= scope:cm_country
+	NOT = { integration_level = conquered }
+	num_civil_constructions < 1
+	save_temporary_scope_as = ppcm_here
+	scope:cm_country = {
+		NOT = { is_target_in_variable_list = { name = cm_q_locations target = scope:ppcm_here } }
+		NOT = { is_target_in_variable_list = { name = cm_q_ungated_locations target = scope:ppcm_here } }
+		NOT = { is_target_in_variable_list = { name = cm_gui_upgrade_locations target = scope:ppcm_here } }
+		NOT = { is_target_in_variable_list = { name = cm_q_food_locations target = scope:ppcm_here } }
+		NOT = { is_target_in_variable_list = { name = cm_q_food_rgo_locations target = scope:ppcm_here } }
+		NOT = { is_target_in_variable_list = { name = cm_q_rgo_locations target = scope:ppcm_here } }
+		NOT = { is_target_in_variable_list = { name = cm_q_urbanize_locations target = scope:ppcm_here } }
+	}
+}
+
+# Location scope: the food feature may build here: the player's location, not switched off with Construction
+# Manager's Auto-Food button of the location.
+ppcm_food_ok = {
+	owner ?= scope:cm_country
+	NOT = { exists = var:cm_auto_food_location_excluded }
+}
+
+# Location scope: the improvement feature may build here.
+ppcm_improve_ok = {
+	owner ?= scope:cm_country
+	NOT = { integration_level = conquered }
+}
+
+# Location scope: the logistics feature wants a level here: market access without event effects below the line while
+# the owner controls the location. The buildings' own gates (access, building levels, one level at a time) still apply.
+ppcm_logistics_wanted = {
+	owner ?= scope:cm_country
+	NOT = { integration_level = conquered }
+	controller ?= owner
+	ppcm_access_normal < ppcm_access_line
+}
+
+# Any scope: the current province has not staged a food construction yet this month (one a province).
+ppcm_may_try = {
+	scope:cm_country = { NOT = { has_variable = ppcm_hit } }
+}
+
+# Province scope, in ppcm_food_province (scope:ppcm_fy = ppcm_food_in_a_year, read once a province): hungry = a
+# normal year leaves less than the line in the store a year from now (a bad harvest alone does not count, a province
+# that refills by itself within the year neither).
+ppcm_hungry = {
+	has_variable = pp_stored_food_months
+	scope:ppcm_fy < ppcm_hungry_months
+}
+
+# Province scope, in ppcm_food_province: the famine line.
+ppcm_famine = {
+	has_variable = pp_stored_food_months
+	scope:ppcm_fy < ppcm_famine_months
+}
+
+# Province scope: a Granary is due: the store can hold less than the line's months of consumption, it is at least the
+# line's share full, and a normal month still adds food (otherwise the surplus, not the room, keeps the store low and
+# a Granary adds nothing).
+ppcm_granary_due = {
+	has_variable = pp_stored_food_months
+	ppcm_capacity_months > 0
+	ppcm_capacity_months < ppcm_granary_cap
+	ppcm_fill_pct >= ppcm_granary_fill
+	ppcm_normal_gain > 0
+}
+
+# Province scope: a Grange is due: the store holds 24 months (the stored-food effects stop rising there) and a normal
+# month still adds the line's share of consumption on top.
+ppcm_grange_due = {
+	has_variable = pp_stored_food_months
+	var:pp_stored_food_months > 123.5
+	ppcm_normal_gain_pct >= ppcm_grange_surplus
+}
+
+# Location scope: the location's market holds the victuals a Tavern would serve.
+ppcm_victuals_here = {
+	market ?= {
+		"stockpile_in_market(goods:victuals)" >= ppcm_tavern_victuals
+	}
+}

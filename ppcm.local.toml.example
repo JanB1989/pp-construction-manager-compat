@@ -1,0 +1,14 @@
+# Copy to ppcm.local.toml (ignored by git) and fix the paths for this machine.
+[paths]
+# Prosper or Perish: the built mod folder (the constructor's mod/pp) and the constructor checkout (its data)
+pp_mod = "/home/jan/development/ProsperOrPerishConstructor-cmf/mod/pp"
+pp_repo = "/home/jan/development/ProsperOrPerishConstructor-cmf"
+# Construction Manager and the Community Mod Framework (Steam workshop folders)
+cm = "/mnt/c/Games/steamapps/workshop/content/3450310/3736668860"
+cmf = "/mnt/c/Games/steamapps/workshop/content/3450310/3692202776"
+# the game (the folder that holds in_game, main_menu, dlc); a local mirror is faster than the install under WSL
+vanilla = "/home/jan/.cache/eu5-vanilla/game"
+
+[deploy]
+# the live mod folder this patch is copied to by `ppcm deploy --yes`
+target = "/mnt/c/Users/Anwender/Documents/Paradox Interactive/Europa Universalis V/mod/Prosper or Perish - Construction Manager Compatibility"

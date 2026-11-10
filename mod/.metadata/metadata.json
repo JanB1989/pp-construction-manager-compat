@@ -1,0 +1,14 @@
+{
+	"name": "Prosper or Perish - Construction Manager Compatibility",
+	"id": "janb1989.pp_construction_manager_compat",
+	"version": "0.1.0",
+	"supported_game_version": "1.4.*",
+	"short_description": "Lets Construction Manager run with Prosper or Perish: merged interface files, and Prosper or Perish's food, Granary and improvement rules as Construction Manager features. Load it after both.",
+	"tags": ["Utilities", "User Interface", "1.4"],
+	"relationships": [
+		{ "rel_type": "dependency", "id": "community_mod_framework", "display_name": "Community Mod Framework", "resource_type": "mod", "version": "2.*" },
+		{ "rel_type": "dependency", "id": "romaimperator.construction_manager", "display_name": "Construction Manager", "resource_type": "mod", "version": "2.*" },
+		{ "rel_type": "dependency", "id": "prosperorperish", "display_name": "Prosper or Perish", "resource_type": "mod", "version": "0.*" }
+	],
+	"game_custom_data": {}
+}
