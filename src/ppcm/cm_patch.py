@@ -11,6 +11,8 @@ file and move the anchor. The built files carry CM's code and are not committed 
 * ``cm_feature_effects.txt``: CM's Auto-Food runs Prosper or Perish's food rule (``ppcm_run_food``). CM's own food
   rule builds vanilla food buildings by vanilla food output; in Prosper or Perish food comes from stored Province
   Food, farms, kitchens and Taverns, so its picks would be wrong.
+* CM's food values, triggers and effects and its food filter: their farming village option is switched off
+  (Prosper or Perish has no farming_village; the links failed at load).
 """
 
 from __future__ import annotations
@@ -79,10 +81,57 @@ def patch_auto_food(text: str) -> str:
     return text[:match.start()] + body + text[match.end():]
 
 
+# ---- Vanilla buildings Prosper or Perish removed ----
+# Prosper or Perish has no farming_village (its crop farms took its place). CM's vanilla food rule has a farming
+# village option, and every `building_type:farming_village` link fails when the game loads ("Failed to find
+# 'farming_village' from database"). That rule no longer runs (patch_auto_food), so the option is switched off where
+# it is defined and the links are taken out; CM's other food options stay as they are.
+
+def _body(text: str, name: str, body: str, where: str) -> str:
+    match = re.search(rf"(?m)^{name} = \{{\n.*?^\}}\n", text, re.DOTALL)
+    if not match:
+        raise AnchorMissing(f"{where}: {name} is gone (CM changed?)")
+    return text[:match.start()] + f"{name} = {{\n\t# Prosper or Perish compatibility: no farming_village in Prosper or Perish\n{body}}}\n" + text[match.end():]
+
+
+def patch_food_values(text: str) -> str:
+    where = "cm_food_auto_build_script_values.txt"
+    text = _body(text, "cm_food_farming_village_level", "\tvalue = 0\n", where)
+    return _body(text, "cm_food_expected_gold_for_farming_village", "\tvalue = 0\n", where)
+
+
+def patch_food_triggers(text: str) -> str:
+    where = "cm_food_auto_build_triggers.txt"
+    for name in ("cm_food_can_build_farming_village", "cm_food_option_farming_village_discounted",
+                 "cm_food_option_farming_village_unshortaged"):
+        text = _body(text, name, "\talways = no\n", where)
+    return text
+
+
+def patch_food_effects(text: str) -> str:
+    return _replace(text, "\t\tcm_food_stage_building_option = { ACTION = 2 BT = building_type:farming_village }\n",
+                    "\t\t# Prosper or Perish compatibility: no farming_village in Prosper or Perish\n",
+                    "cm_food_auto_build_effects.txt")
+
+
+def patch_filter_values(text: str) -> str:
+    return _replace(text, (
+        "\tsubtract = {\n"
+        "\t\tvalue = \"location_building_level(building_type:farming_village)\"\n"
+        "\t\tmultiply = \"building_efficiency(building_type:farming_village)\"\n"
+        "\t\tmultiply = 0.025  # FV 2.5%/level\n"
+        "\t}\n"
+    ), "\t# Prosper or Perish compatibility: no farming_village in Prosper or Perish\n", "cm_filter_script_values.txt")
+
+
 PATCHES = {
     "in_game/common/scripted_effects/cm_cmm_effects.txt": patch_registration,
     "in_game/common/on_action/cm_on_action.txt": patch_dispatcher,
     "in_game/common/scripted_effects/cm_feature_effects.txt": patch_auto_food,
+    "in_game/common/script_values/cm_food_auto_build_script_values.txt": patch_food_values,
+    "in_game/common/scripted_triggers/cm_food_auto_build_triggers.txt": patch_food_triggers,
+    "in_game/common/scripted_effects/cm_food_auto_build_effects.txt": patch_food_effects,
+    "in_game/common/script_values/cm_filter_script_values.txt": patch_filter_values,
 }
 
 

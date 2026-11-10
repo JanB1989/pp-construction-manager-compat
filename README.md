@@ -45,6 +45,11 @@ uv run ppcm deploy --yes                     # copy it to the live mod folder
 uv run pytest -q
 ```
 
+The Prosper or Perish constructor (branch `cmf-compat`) runs `ppcm deploy` after every `ppc sync` when its
+`constructor.local.toml` names this repository (`[cm_compat] repo`), so the merged interface files follow every change of
+Prosper or Perish's. While EU5 runs, `--game-running` deploys interface and text only and leaves game-data changes for
+the next deploy (a hot reload of game data breaks a running game).
+
 Layout: `mod/` the patch's own files; `src/ppcm/gui_merge.py` the interface merges; `src/ppcm/rules.py` the generated
 rule parts from Prosper or Perish's buildings (`ppcm.toml` holds the rules' numbers); `src/ppcm/cm_patch.py` the three
 Construction Manager files that learn of the new rows.

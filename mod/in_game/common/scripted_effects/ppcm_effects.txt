@@ -186,9 +186,11 @@ ppcm_food_province = {
 
 # ---- Staging (location scope) ----
 
-# Stage one level of $type$ here (the generated pickers; $why$ is the plan's construction code, unused here).
+# Stage one level of $type$ here (the generated pickers; $why$ is the plan's construction code: the engine refuses a
+# scripted effect that leaves an argument unused, so it is kept as ppcm_why).
 ppcm_construct = {
 	building_type:$type$ = { save_scope_as = ppcm_btype }
+	save_temporary_scope_value_as = { name = ppcm_why value = $why$ }
 	ppcm_construct_scoped = yes
 }
 ppcm_construct_food = {

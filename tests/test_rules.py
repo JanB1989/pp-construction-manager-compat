@@ -146,3 +146,49 @@ def test_food_rule_steps() -> None:
     assert "ppcm_try_granary_here" not in body
     assert body.count("NOT = { any_location_in_province = { ppcm_food_queued = yes } }") == 2
     assert "save_temporary_scope_value_as = { name = ppcm_fy value = ppcm_food_in_a_year }" in body
+
+
+def test_no_building_is_missing() -> None:
+    """Every building type the loaded files name exists: Construction Manager files as the patch ships or leaves them,
+    and the patch's own (PP removed vanilla's farming_village; CM's links to it failed at load, 2026-11-10)."""
+    from ppcm import plan_core as plan
+
+    ctx = Context.load()
+    known = set(plan._database(ctx.pp_mod, ctx.vanilla.parent, plan.BUILDING_TYPES))
+    for root in [*sorted((ctx.vanilla / "dlc").glob("*")), ctx.cm]:
+        folder = root / "in_game/common/building_types"
+        if folder.is_dir():
+            for path in folder.glob("*.txt"):
+                known |= {name.split(":")[-1] for name, _ in plan._blocks(read(path))}
+    texts = dict(_built())
+    for path in (ctx.cm / "in_game/common").rglob("*.txt"):
+        texts.setdefault(str(path.relative_to(ctx.cm)), read(path))
+    for path in MOD_SOURCE.rglob("*.txt"):
+        texts[str(path.relative_to(MOD_SOURCE))] = read(path)
+    for rel, text in texts.items():
+        for name in re.findall(r"building_type:([a-z_0-9]+)", _code(text)):
+            assert name in known, f"{rel}: building_type:{name} does not exist"
+
+
+def test_every_call_passes_the_arguments_its_effect_uses() -> None:
+    """The engine refuses a scripted effect called with an argument it does not use (ppcm_construct = { why }
+    failed to compile 24 times at load, 2026-11-10)."""
+    built = _built()
+    texts = {rel: _code(t) for rel, t in built.items() if not rel.split("/")[-1].startswith("cm_")}
+    for path in MOD_SOURCE.rglob("*.txt"):
+        texts[str(path.relative_to(MOD_SOURCE))] = _code(read(path))
+    params: dict[str, set[str]] = {}
+    for rel, text in texts.items():
+        if "scripted_effects" in rel or "scripted_triggers" in rel:
+            for match in re.finditer(r"(?m)^(ppcm_[a-z0-9_]+) = \{\n(.*?)^\}", text, re.DOTALL):
+                params[match.group(1)] = set(re.findall(r"\$([a-z_]+)\$", match.group(2)))
+    checked = 0
+    for rel, text in texts.items():
+        for match in re.finditer(r"(?<![:.\w])(ppcm_[a-z0-9_]+) = \{ ([^{}\n]*?) \}", text):
+            name, inner = match.group(1), match.group(2)
+            if name not in params:
+                continue
+            given = set(re.findall(r"([a-z_]+) = ", inner))
+            assert given == params[name], f"{rel}: {name} called with {sorted(given)}, uses {sorted(params[name])}"
+            checked += 1
+    assert checked > 50  # the generated pickers call ppcm_construct / ppcm_construct_food
